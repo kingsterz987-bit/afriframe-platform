@@ -1,0 +1,220 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..800;1,400..700&family=Cinzel:wght@400..700&family=Inter:wght@300..700&family=Manrope:wght@300..700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Afriframe Studio — Luxury Editorial Design System.
+   All colors are HSL tokens. Light = editorial. Dark = cinematic. */
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 3% 6%;
+
+    --surface: 60 11% 97%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 3% 6%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 3% 6%;
+
+    /* Champagne gold */
+    --primary: 39 55% 63%;
+    --primary-foreground: 240 3% 6%;
+
+    --secondary: 60 11% 97%;
+    --secondary-foreground: 240 3% 6%;
+
+    --muted: 60 11% 96%;
+    --muted-foreground: 0 0% 37%;
+
+    --accent: 226 100% 65%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 358 75% 59%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 158 75% 43%;
+
+    --border: 0 0% 91%;
+    --input: 0 0% 91%;
+    --ring: 39 55% 63%;
+
+    --radius: 1.25rem;
+
+    --gold: 39 55% 63%;
+    --gold-soft: 39 55% 63%;
+
+    --glass-bg: 0 0% 100% / 0.7;
+    --glass-border: 0 0% 0% / 0.06;
+
+    --shadow-soft: 0 4px 24px hsl(0 0% 0% / 0.06);
+    --shadow-lift: 0 12px 40px hsl(0 0% 0% / 0.1);
+    --shadow-glow: 0 18px 60px hsl(var(--gold) / 0.28);
+
+    --ease-lux: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .dark {
+    --background: 240 3% 6%;
+    --foreground: 0 0% 98%;
+
+    --surface: 0 0% 9%;
+
+    --card: 0 0% 11%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 9%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 39 55% 63%;
+    --primary-foreground: 240 3% 6%;
+
+    --secondary: 0 0% 11%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 72%;
+
+    --accent: 226 100% 65%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 358 75% 59%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 17%;
+    --input: 0 0% 17%;
+    --ring: 39 55% 63%;
+
+    --glass-bg: 0 0% 100% / 0.05;
+    --glass-border: 0 0% 100% / 0.1;
+
+    --shadow-soft: 0 4px 24px hsl(0 0% 0% / 0.5);
+    --shadow-lift: 0 18px 50px hsl(0 0% 0% / 0.6);
+    --shadow-glow: 0 20px 70px hsl(var(--gold) / 0.18);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', sans-serif;
+    transition: background-color 400ms var(--ease-lux), color 400ms var(--ease-lux);
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'Playfair Display', serif;
+    letter-spacing: -0.015em;
+  }
+
+  ::selection {
+    background: hsl(var(--gold) / 0.28);
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--gold));
+    outline-offset: 3px;
+  }
+}
+
+@layer components {
+  .lux-container {
+    @apply mx-auto w-full max-w-[1500px] px-6 md:px-10 lg:px-16;
+  }
+
+  .lux-section {
+    @apply py-16 md:py-24 lg:py-32;
+  }
+
+  .eyebrow {
+    font-family: 'Cinzel', serif;
+    @apply text-[11px] md:text-xs uppercase tracking-[0.32em] text-primary;
+  }
+
+  .display {
+    font-family: 'Playfair Display', serif;
+    @apply text-[2.75rem] leading-[1.02] sm:text-6xl lg:text-7xl xl:text-[5.5rem];
+  }
+
+  .numeric {
+    font-family: 'Manrope', sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .glass {
+    background: hsl(var(--glass-bg));
+    border: 1px solid hsl(var(--glass-border));
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .lux-card {
+    @apply rounded-[20px] border bg-card;
+    box-shadow: var(--shadow-soft);
+    transition: transform 450ms var(--ease-lux), box-shadow 450ms var(--ease-lux),
+      border-color 450ms var(--ease-lux);
+  }
+
+  .lux-card:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-lift);
+    border-color: hsl(var(--gold) / 0.45);
+  }
+
+  .gold-text {
+    background: linear-gradient(100deg, hsl(39 60% 55%), hsl(42 78% 78%), hsl(39 60% 55%));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .gold-rule {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(var(--gold) / 0.6), transparent);
+  }
+
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .camera-mask {
+    -webkit-mask-image: radial-gradient(ellipse 62% 58% at 52% 50%, #000 42%, transparent 78%);
+    mask-image: radial-gradient(ellipse 62% 58% at 52% 50%, #000 42%, transparent 78%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@keyframes blob {
+  0% { transform: translate(-100%, -100%); }
+  25% { transform: translate(0%, -100%); }
+  50% { transform: translate(0%, 0%); }
+  75% { transform: translate(-100%, 0%); }
+  100% { transform: translate(-100%, -100%); }
+}
+
+.animate-blob {
+  animation: blob 5s linear infinite;
+}
