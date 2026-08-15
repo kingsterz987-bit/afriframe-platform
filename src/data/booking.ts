@@ -217,8 +217,6 @@ export const experiences: Experience[] = [
   },
 ];
 
-export const timeSlots = ["09:00", "10:30", "12:00", "14:00", "16:30", "18:00"];
-
 export const projectTypes = [
   "Destination Shoot",
   "Creative Campaign",
