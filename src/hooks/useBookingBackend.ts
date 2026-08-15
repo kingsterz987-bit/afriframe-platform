@@ -130,7 +130,7 @@ export const useBookingBackend = () => {
         booked,
         remaining: Math.max(0, maxBookings - booked),
         slots,
-        notes: override?.notes ?? null,
+        notes: null,
       };
     }
 
