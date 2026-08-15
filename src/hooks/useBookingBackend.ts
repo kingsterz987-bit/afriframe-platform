@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { afriframe, type DbAvailability, type DbService } from "@/integrations/afriframe/client";
+import { afriframe, type DbService } from "@/integrations/afriframe/client";
 import { experiences, type Experience } from "@/data/booking";
 
 export const toDateKey = (d: Date) =>
@@ -44,9 +44,38 @@ export type DayAvailability = {
 /** Calendar status priority: blocked → booked → available. */
 export type DateStatus = "available" | "booked" | "blocked";
 
-/** System defaults used when the admin has NOT configured a date. */
+/** Capacity used when the RPC does not return an explicit value. */
 const DEFAULT_CAPACITY = 3;
-const DEFAULT_SLOTS = ["09:00", "12:00", "14:00", "16:00"];
+
+const normalizeTimeSlot = (value: unknown): string | null => {
+  const raw = String(value ?? "").trim();
+  const match = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (!match) return null;
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return null;
+  return `${String(hour).padStart(2, "0")}:${match[2]}`;
+};
+
+const normalizeTimeSlots = (values: unknown): string[] => {
+  const parsed =
+    typeof values === "string"
+      ? (() => {
+          try {
+            return JSON.parse(values);
+          } catch {
+            return [];
+          }
+        })()
+      : values;
+
+  return [...new Set(
+    (Array.isArray(parsed) ? parsed : [])
+      .map(normalizeTimeSlot)
+      .filter((value): value is string => value !== null)
+  )];
+};
 
 /** Row shape returned by the backend's public availability RPC. */
 type CalendarRow = {
@@ -55,6 +84,7 @@ type CalendarRow = {
   booking_count: number | null;
   is_override: boolean | null;
   status: string | null;
+  time_slots: unknown;
 };
 
 const shiftMonth = (delta: number) => {
@@ -88,19 +118,12 @@ export const useBookingBackend = () => {
     const start = toDateKey(shiftMonth(-1));
     const end = toDateKey(shiftMonth(19));
 
-    const [calendarRes, availRes] = await Promise.all([
-      afriframe.rpc("get_availability_calendar", { p_start: start, p_end: end }),
-      // Only used for admin time-slot / notes overrides; never for open/closed state.
-      afriframe.from("availability").select("*"),
-    ]);
+    const calendarRes = await afriframe.rpc("get_availability_calendar", {
+      p_start: start,
+      p_end: end,
+    });
 
     if (calendarRes.error) console.error("[booking] calendar load failed:", calendarRes.error);
-    if (availRes.error) console.error("[booking] availability load failed:", availRes.error);
-
-    const overrides: Record<string, DbAvailability> = {};
-    for (const row of (availRes.data as DbAvailability[]) ?? []) {
-      overrides[String(row.date).slice(0, 10)] = row;
-    }
 
     const next: Record<string, DayAvailability> = {};
     for (const row of (calendarRes.data as CalendarRow[]) ?? []) {
@@ -108,11 +131,7 @@ export const useBookingBackend = () => {
       // so no UTC conversion can shift a day.
       const key = String(row.date).slice(0, 10);
       const status = (row.status ?? "").toLowerCase();
-      const override = overrides[key];
-      const slots =
-        override && Array.isArray(override.time_slots) && override.time_slots.length > 0
-          ? override.time_slots.map(String)
-          : DEFAULT_SLOTS;
+      const slots = normalizeTimeSlots(row.time_slots);
 
       const maxBookings =
         row.capacity && row.capacity > 0 ? Number(row.capacity) : DEFAULT_CAPACITY;
@@ -125,7 +144,7 @@ export const useBookingBackend = () => {
         booked,
         remaining: Math.max(0, maxBookings - booked),
         slots,
-        notes: override?.notes ?? null,
+        notes: null,
       };
     }
 
@@ -139,22 +158,30 @@ export const useBookingBackend = () => {
     loadAvailability();
   }, [loadServices, loadAvailability]);
 
-  // Live updates when the CMS changes availability / bookings.
+  // Keep the public page in sync when the CMS changes an override, a booking,
+  // or the global defaults. The RPC is always refetched; the client never
+  // merges stale slots into the current date.
   useEffect(() => {
+    const refresh = () => {
+      void loadAvailability();
+    };
+
     const channel = afriframe
       .channel("afriframe-booking")
-      .on("postgres_changes", { event: "*", schema: "public", table: "availability" }, () =>
-        loadAvailability()
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "bookings" }, () =>
-        loadAvailability()
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "availability" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "studio_settings" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "bookings" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "services" }, () =>
-        loadServices()
+        void loadServices()
       )
       .subscribe();
 
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+
     return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
       afriframe.removeChannel(channel);
     };
   }, [loadAvailability, loadServices]);
@@ -171,7 +198,7 @@ export const useBookingBackend = () => {
         maxBookings: DEFAULT_CAPACITY,
         booked: 0,
         remaining: DEFAULT_CAPACITY,
-        slots: DEFAULT_SLOTS,
+        slots: [],
         notes: null,
       },
     [availability]
@@ -273,6 +300,10 @@ export const submitBooking = async (
   input: BookingSubmission
 ): Promise<{ ok: boolean; bookingId?: string; message?: string }> => {
   const email = input.email.trim().toLowerCase();
+  const normalizedTime = normalizeTimeSlot(input.time);
+  if (!normalizedTime) {
+    return { ok: false, message: "Please choose a valid booking time." };
+  }
 
   try {
     let clientId: string | undefined;
@@ -312,7 +343,7 @@ export const submitBooking = async (
       p_service_id: input.serviceId,
       p_client_id: clientId,
       p_booking_date: toDateKey(input.date),
-      p_booking_time: input.time.length === 5 ? `${input.time}:00` : input.time,
+      p_booking_time: `${normalizedTime}:00`,
       p_message: input.message?.trim() || null,
     });
 
