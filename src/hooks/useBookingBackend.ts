@@ -58,10 +58,24 @@ const normalizeTimeSlot = (value: unknown): string | null => {
   return `${String(hour).padStart(2, "0")}:${match[2]}`;
 };
 
-const normalizeTimeSlots = (values: unknown): string[] =>
-  (Array.isArray(values) ? values : [])
-    .map(normalizeTimeSlot)
-    .filter((value): value is string => value !== null);
+const normalizeTimeSlots = (values: unknown): string[] => {
+  const parsed =
+    typeof values === "string"
+      ? (() => {
+          try {
+            return JSON.parse(values);
+          } catch {
+            return [];
+          }
+        })()
+      : values;
+
+  return [...new Set(
+    (Array.isArray(parsed) ? parsed : [])
+      .map(normalizeTimeSlot)
+      .filter((value): value is string => value !== null)
+  )];
+};
 
 /** Row shape returned by the backend's public availability RPC. */
 type CalendarRow = {
@@ -144,22 +158,30 @@ export const useBookingBackend = () => {
     loadAvailability();
   }, [loadServices, loadAvailability]);
 
-  // Live updates when the CMS changes availability / bookings.
+  // Keep the public page in sync when the CMS changes an override, a booking,
+  // or the global defaults. The RPC is always refetched; the client never
+  // merges stale slots into the current date.
   useEffect(() => {
+    const refresh = () => {
+      void loadAvailability();
+    };
+
     const channel = afriframe
       .channel("afriframe-booking")
-      .on("postgres_changes", { event: "*", schema: "public", table: "availability" }, () =>
-        loadAvailability()
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "bookings" }, () =>
-        loadAvailability()
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "availability" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "studio_settings" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "bookings" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "services" }, () =>
-        loadServices()
+        void loadServices()
       )
       .subscribe();
 
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+
     return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
       afriframe.removeChannel(channel);
     };
   }, [loadAvailability, loadServices]);
