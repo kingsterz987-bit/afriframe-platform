@@ -1,22 +1,17 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
-import { usePublicMedia } from "@/hooks/usePublicMedia";
+import { collections } from "@/data/site";
 
-const filters = ["All", "Weddings", "Portraits", "Commercial", "Fashion", "Events", "Short Films", "Other"];
+const filters = ["All", "Weddings", "Portraits", "Commercial", "Fashion", "Events"];
 
 const Portfolio = () => {
   const [active, setActive] = useState("All");
-  const { media, loading } = usePublicMedia();
 
-  const visible = useMemo(() => {
-    const grouped = new Map<string, (typeof media)[number]>();
-    media.forEach((item) => {
-      const key = item.category.toLowerCase();
-      if (!grouped.has(key) || item.featured) grouped.set(key, item);
-    });
-    return [...grouped.values()].filter((item) => active === "All" || item.category === active);
-  }, [active, media]);
+  const visible = useMemo(
+    () => (active === "All" ? collections : collections.filter((c) => c.category === active)),
+    [active]
+  );
 
   return (
     <section id="portfolio" className="lux-section relative bg-background">
@@ -49,7 +44,7 @@ const Portfolio = () => {
         </div>
 
         <div className="mt-14 grid auto-rows-[260px] grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {!loading && visible.map((c, i) => (
+          {visible.map((c, i) => (
             <Link
               key={c.id}
               to="/explore"
@@ -58,7 +53,7 @@ const Portfolio = () => {
               }`}
             >
               <img
-                src={c.mediaUrl}
+                src={c.image}
                 alt={`${c.title} collection`}
                 loading={i > 2 ? "lazy" : "eager"}
                 className="h-full w-full object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.06]"
@@ -66,11 +61,11 @@ const Portfolio = () => {
               <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent opacity-90" />
               <div className="absolute inset-x-0 bottom-0 p-6">
                 <span className="font-cinzel text-[10px] uppercase tracking-[0.3em] text-primary">
-                  {c.category} · <span className="numeric">{media.filter((item) => item.category === c.category).length}</span> frames
+                  {c.category} · <span className="numeric">{c.count}</span> frames
                 </span>
                 <h3 className="mt-2 text-2xl text-white">{c.title}</h3>
                 <p className="mt-1 max-w-sm translate-y-2 text-sm text-white/70 opacity-0 transition-all duration-500 group-hover:translate-y-0 group-hover:opacity-100">
-                  {c.description ?? `A curated ${c.category.toLowerCase()} collection.`}
+                  {c.descriptor}
                 </p>
               </div>
               <span className="absolute right-5 top-5 grid h-10 w-10 place-items-center rounded-full border border-white/25 bg-black/30 text-white opacity-0 backdrop-blur transition-all duration-500 group-hover:opacity-100">
