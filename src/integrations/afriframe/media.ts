@@ -57,5 +57,4 @@ export async function fetchPublicMedia(): Promise<PublicMedia[]> {
     .filter((item): item is PublicMedia => item !== null && item.visible)
     .sort((a, b) => a.displayOrder - b.displayOrder || a.title.localeCompare(b.title));
 }
-EOF
 
