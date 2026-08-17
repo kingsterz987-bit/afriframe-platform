@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { CollectionSection } from "@/components/portfolio/collection-section";
 import { CategoryFilters } from "@/components/portfolio/category-filters";
 import { VideoCollectionGrid } from "@/components/portfolio/video-collection-grid";
 import { CollectionDetailModal } from "@/components/portfolio/collection-detail-modal";
+import { supabase } from "@/integrations/supabase/client";
 
 // New provided images - using blob URLs
 const familyPortrait = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/imgi_18_491439725_18497317444016923_86191005857537098_n-WcTN2AcOJwfT2TnRJ3ArnYbWMOJraB.jpg";
@@ -75,6 +76,18 @@ const curatedCollections = [
   },
 ];
 
+type GalleryPhoto = {
+  id: string;
+  title: string | null;
+  description: string | null;
+  category: string | null;
+  image_url: string;
+  thumbnail_url: string | null;
+  display_order: number | null;
+  is_hidden: boolean | null;
+  alt_text: string | null;
+};
+
 const videoCollections = [
   { id: 1, src: videoWedding1, title: "Timeless Love Stories", category: "Weddings", description: "Cinematic wedding films that capture emotion and grace" },
   { id: 2, src: videoFashion1, title: "Fashion in Motion", category: "Fashion", description: "Dynamic editorial videography that brings style to life" },
@@ -89,13 +102,64 @@ const Explore = () => {
   const [selectedCollection, setSelectedCollection] = useState<any>(null);
   const [selectedVideo, setSelectedVideo] = useState<any>(null);
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
+  const [galleryPhotos, setGalleryPhotos] = useState<GalleryPhoto[]>([]);
 
-  const filteredCollections = 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadGallery = async () => {
+      const { data, error } = await (supabase as any)
+        .from("photography_gallery")
+        .select("id,title,description,category,image_url,thumbnail_url,display_order,is_hidden,alt_text")
+        .eq("is_hidden", false)
+        .order("display_order", { ascending: true })
+        .order("created_at", { ascending: true });
+
+      if (!cancelled && !error && data?.length) {
+        setGalleryPhotos(data as GalleryPhoto[]);
+      }
+    };
+
+    void loadGallery();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const liveCollections = useMemo(() => {
+    if (!galleryPhotos.length) return curatedCollections;
+
+    const groups = new Map<string, GalleryPhoto[]>();
+    for (const photo of galleryPhotos) {
+      const category = photo.category?.trim() || "Photography";
+      groups.set(category, [...(groups.get(category) ?? []), photo]);
+    }
+
+    return [...groups.entries()].map(([category, photos]) => {
+      const images = photos.map((photo) => ({
+        src: photo.image_url,
+        title: photo.title || category,
+        size: "small" as const,
+      }));
+      const featured = photos[0];
+      return {
+        title: category,
+        category,
+        description: featured.description || "A curated collection from Afriframe Pictures.",
+        frameCount: photos.length,
+        featuredImage: featured.thumbnail_url || featured.image_url,
+        supportingImages: images.slice(1, 4),
+        allImages: photos.map((photo) => photo.thumbnail_url || photo.image_url),
+      };
+    });
+  }, [galleryPhotos]);
+
+  const filteredCollections =
     activeCategory === "All"
-      ? curatedCollections
-      : curatedCollections.filter(c => c.category === activeCategory);
+      ? liveCollections
+      : liveCollections.filter((c) => c.category === activeCategory);
 
-  const categories = [...new Set(curatedCollections.map(c => c.category))];
+  const categories = [...new Set(liveCollections.map((c) => c.category))];
 
   const handleViewCollection = (collection: any) => {
     setSelectedCollection({

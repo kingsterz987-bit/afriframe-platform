@@ -8,7 +8,6 @@ import Index from "./pages/Index";
 import Booking from "./pages/Booking";
 import Explore from "./pages/Explore";
 import NotFound from "./pages/NotFound";
-import GalleryCMS from "./pages/GalleryCMS";
 
 const queryClient = new QueryClient();
 
@@ -23,7 +22,6 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/booking" element={<Booking />} />
             <Route path="/explore" element={<Explore />} />
-            <Route path="/cms/gallery" element={<GalleryCMS />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
