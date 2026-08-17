@@ -88,7 +88,19 @@ type GalleryPhoto = {
   alt_text: string | null;
 };
 
-const videoCollections = [
+type GalleryVideo = {
+  id: string;
+  title: string | null;
+  description: string | null;
+  category: string | null;
+  video_url: string;
+  thumbnail_url: string | null;
+  display_order: number | null;
+  is_hidden: boolean | null;
+  alt_text: string | null;
+};
+
+const fallbackVideoCollections = [
   { id: 1, src: videoWedding1, title: "Timeless Love Stories", category: "Weddings", description: "Cinematic wedding films that capture emotion and grace" },
   { id: 2, src: videoFashion1, title: "Fashion in Motion", category: "Fashion", description: "Dynamic editorial videography that brings style to life" },
   { id: 3, src: videoCommercial, title: "Brand Narratives", category: "Commercial", description: "Commercial storytelling that resonates and inspires" },
@@ -103,6 +115,7 @@ const Explore = () => {
   const [selectedVideo, setSelectedVideo] = useState<any>(null);
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
   const [galleryPhotos, setGalleryPhotos] = useState<GalleryPhoto[]>([]);
+  const [galleryVideos, setGalleryVideos] = useState<GalleryVideo[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,10 +134,37 @@ const Explore = () => {
     };
 
     void loadGallery();
+
+    const loadVideos = async () => {
+      const { data, error } = await (supabase as any)
+        .from("videography_gallery")
+        .select("id,title,description,category,video_url,thumbnail_url,display_order,is_hidden,alt_text")
+        .eq("is_hidden", false)
+        .order("display_order", { ascending: true })
+        .order("created_at", { ascending: true });
+
+      if (!cancelled && !error && data?.length) {
+        setGalleryVideos(data as GalleryVideo[]);
+      }
+    };
+
+    void loadVideos();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const videoCollections = useMemo(() => {
+    if (!galleryVideos.length) return fallbackVideoCollections;
+    return galleryVideos.map((video) => ({
+      id: video.id,
+      src: video.video_url,
+      title: video.title || video.category || "Cinematic Story",
+      category: video.category || "Videography",
+      description: video.description || "Cinematic storytelling by Afriframe Pictures.",
+      thumbnail: video.thumbnail_url || undefined,
+    }));
+  }, [galleryVideos]);
 
   const liveCollections = useMemo(() => {
     if (!galleryPhotos.length) return curatedCollections;
