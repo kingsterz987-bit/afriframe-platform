@@ -38,6 +38,7 @@ export type DayAvailability = {
   booked: number;
   remaining: number;
   slots: string[];
+  takenSlots: string[];
   notes: string | null;
 };
 
@@ -85,6 +86,7 @@ type CalendarRow = {
   is_override: boolean | null;
   status: string | null;
   time_slots: unknown;
+  booked_slots?: unknown;
 };
 
 const shiftMonth = (delta: number) => {
@@ -132,6 +134,7 @@ export const useBookingBackend = () => {
       const key = String(row.date).slice(0, 10);
       const status = (row.status ?? "").toLowerCase();
       const slots = normalizeTimeSlots(row.time_slots);
+      const takenSlots = normalizeTimeSlots(row.booked_slots);
 
       const maxBookings =
         row.capacity && row.capacity > 0 ? Number(row.capacity) : DEFAULT_CAPACITY;
@@ -144,6 +147,7 @@ export const useBookingBackend = () => {
         booked,
         remaining: Math.max(0, maxBookings - booked),
         slots,
+        takenSlots,
         notes: null,
       };
     }
@@ -199,6 +203,7 @@ export const useBookingBackend = () => {
         booked: 0,
         remaining: DEFAULT_CAPACITY,
         slots: [],
+        takenSlots: [],
         notes: null,
       },
     [availability]
@@ -233,7 +238,10 @@ export const useBookingBackend = () => {
       const day = dayFor(d);
       if (!day) return [] as { time: string; available: boolean }[];
       const open = day.available && day.remaining > 0;
-      return day.slots.map((time) => ({ time, available: open }));
+      return day.slots.map((time) => ({
+        time,
+        available: open && !day.takenSlots.includes(time),
+      }));
     },
     [dayFor]
   );

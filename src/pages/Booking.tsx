@@ -106,6 +106,12 @@ const Booking = () => {
   const [errors, setErrors] = useState<Partial<Record<keyof Details, string>>>({});
   const [submitting, setSubmitting] = useState(false);
   const [reference, setReference] = useState("");
+  const [confirmedBooking, setConfirmedBooking] = useState<{
+    serviceName: string;
+    dateLabel: string;
+    time: string;
+    status: string;
+  }>();
   const topRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -234,12 +240,17 @@ const Booking = () => {
     }
 
 
-    setReference(
-      result.bookingId
-        ? `AFR-${result.bookingId.slice(0, 8).toUpperCase()}`
-        : `AFR-${new Date().getFullYear()}-${toDateKey(date).replace(/-/g, "")}`
-    );
-    goTo(6, 1);
+  const bookingReference = result.bookingId
+    ? `AFR-${result.bookingId.slice(0, 8).toUpperCase()}`
+    : `AFR-${new Date().getFullYear()}-${toDateKey(date).replace(/-/g, "")}`;
+  setReference(bookingReference);
+  setConfirmedBooking({
+    serviceName: service.name,
+    dateLabel,
+    time: slot,
+    status: "Pending confirmation",
+  });
+  goTo(6, 1);
   };
 
 
