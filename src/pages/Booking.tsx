@@ -1,10 +1,11 @@
-
 import { useEffect, useMemo, useRef, useState } from "react";
+
 import {
   motion,
   AnimatePresence,
   useReducedMotion,
 } from "framer-motion";
+
 import {
   ArrowLeft,
   ArrowRight,
@@ -12,6 +13,7 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react";
+
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -193,6 +195,24 @@ const Booking = () => {
 
   const [slot, setSlot] = useState<string>();
 
+  /*
+   * These values preserve the final booking
+   * information after availability refreshes.
+   *
+   * This prevents the success screen from
+   * showing "—" after the selected slot
+   * becomes unavailable because it was
+   * successfully booked.
+   */
+  const [submittedDate, setSubmittedDate] =
+    useState<Date>();
+
+  const [submittedSlot, setSubmittedSlot] =
+    useState<string>();
+
+  const [submittedServiceName, setSubmittedServiceName] =
+    useState<string>("");
+
   const [details, setDetails] =
     useState<Details>(emptyDetails);
 
@@ -249,30 +269,35 @@ const Booking = () => {
   /*
    * REALTIME DATE VALIDATION
    *
-   * If an admin blocks the selected date,
-   * or another booking fills its capacity,
-   * remove the selected date immediately.
+   * Only validate while the user is still
+   * making the booking.
+   *
+   * Do not run this validation on the
+   * submitted confirmation screen.
    */
   useEffect(() => {
     if (
-      !loadingAvailability &&
-      date &&
-      !isDateSelectable(date)
+      step >= 6 ||
+      loadingAvailability ||
+      !date ||
+      isDateSelectable(date)
     ) {
-      setDate(undefined);
-      setSlot(undefined);
-
-      if (
-        step > 2 &&
-        step < 6
-      ) {
-        setStep(2);
-      }
-
-      toast.error(
-        "That date is no longer available. Please choose another date."
-      );
+      return;
     }
+
+    setDate(undefined);
+    setSlot(undefined);
+
+    if (
+      step > 2 &&
+      step < 6
+    ) {
+      setStep(2);
+    }
+
+    toast.error(
+      "That date is no longer available. Please choose another date."
+    );
   }, [
     date,
     isDateSelectable,
@@ -284,12 +309,21 @@ const Booking = () => {
   /*
    * REALTIME TIME SLOT VALIDATION
    *
-   * If another client books the selected
-   * time slot while this client is still
-   * on the booking page, clear the slot.
+   * Only validate the selected time while
+   * the booking is still being created.
+   *
+   * Once the booking succeeds, the selected
+   * slot naturally becomes unavailable.
+   * We must not clear it on the success page.
    */
   useEffect(() => {
-    if (!date || !slot) return;
+    if (
+      step >= 6 ||
+      !date ||
+      !slot
+    ) {
+      return;
+    }
 
     const selectedSlot =
       slots.find(
@@ -311,6 +345,7 @@ const Booking = () => {
     date,
     slot,
     slots,
+    step,
   ]);
 
 
@@ -475,7 +510,9 @@ const Booking = () => {
 
 
   const confirm = async () => {
-    if (submitting) return;
+    if (submitting) {
+      return;
+    }
 
     if (
       !service ||
@@ -488,6 +525,23 @@ const Booking = () => {
 
       return;
     }
+
+
+    /*
+     * Take a snapshot of the booking before
+     * submitting it.
+     *
+     * These values are used on the success
+     * screen even after availability updates.
+     */
+    const bookingDate =
+      new Date(date);
+
+    const bookingSlot =
+      slot;
+
+    const bookingServiceName =
+      service.name;
 
 
     setSubmitting(true);
@@ -531,70 +585,120 @@ const Booking = () => {
             .join("\n");
 
 
-    const result =
-      await submitBooking({
-        serviceId:
-          service.dbId,
+    try {
+      const result =
+        await submitBooking({
+          serviceId:
+            service.dbId,
 
-        date,
+          date:
+            bookingDate,
 
-        time:
-          slot,
+          time:
+            bookingSlot,
 
-        fullName:
-          details.name,
+          fullName:
+            details.name,
 
-        email:
-          details.email,
+          email:
+            details.email,
 
-        phone:
-          details.phone,
+          phone:
+            details.phone,
 
-        message:
-          notes,
-      });
-
-
-    await refreshAvailability();
-
-    setSubmitting(false);
+          message:
+            notes,
+        });
 
 
-    if (!result.ok) {
-      toast.error(
-        result.message ??
-          "We couldn't complete your booking. Please try again."
-      );
+      if (!result.ok) {
+        setSubmitting(false);
 
-      return;
-    }
+        await refreshAvailability();
+
+        toast.error(
+          result.message ??
+            "We couldn't complete your booking. Please try again."
+        );
+
+        return;
+      }
 
 
-    /*
-     * BOOKING REFERENCE
-     *
-     * Uses the real booking ID returned
-     * from the database.
-     */
-    if (result.bookingId) {
-      setReference(
-        `AFR-${result.bookingId
-          .slice(0, 8)
-          .toUpperCase()}`
-      );
-    } else {
       /*
-       * This should normally never be used
-       * if submitBooking correctly returns
-       * the booking ID.
+       * Save the confirmed booking information.
        */
-      setReference(
-        "AFR-BOOKING"
+      setSubmittedDate(
+        bookingDate
+      );
+
+      setSubmittedSlot(
+        bookingSlot
+      );
+
+      setSubmittedServiceName(
+        bookingServiceName
+      );
+
+
+      /*
+       * BOOKING REFERENCE
+       *
+       * Uses the real booking ID returned
+       * from the database.
+       */
+      if (result.bookingId) {
+        setReference(
+          `AFR-${result.bookingId
+            .slice(0, 8)
+            .toUpperCase()}`
+        );
+      } else {
+        setReference(
+          "AFR-BOOKING"
+        );
+      }
+
+
+      /*
+       * Move to the success screen BEFORE
+       * refreshing availability.
+       *
+       * The slot will now become unavailable
+       * because this booking successfully
+       * reserved it, but our realtime
+       * validation no longer clears it.
+       */
+      setSubmitting(false);
+
+      goTo(6, 1);
+
+
+      /*
+       * Refresh in the background.
+       */
+      refreshAvailability().catch(
+        (error) => {
+          console.error(
+            "Failed to refresh availability:",
+            error
+          );
+        }
+      );
+    } catch (error) {
+      console.error(
+        "Booking submission failed:",
+        error
+      );
+
+      setSubmitting(false);
+
+      await refreshAvailability();
+
+      toast.error(
+        "We couldn't complete your booking. Please try again."
       );
     }
-
-
-    goTo(6, 1);
   };
 
 
@@ -604,6 +708,12 @@ const Booking = () => {
     setDate(undefined);
 
     setSlot(undefined);
+
+    setSubmittedDate(undefined);
+
+    setSubmittedSlot(undefined);
+
+    setSubmittedServiceName("");
 
     setDetails(
       emptyDetails
@@ -699,6 +809,27 @@ const Booking = () => {
           }
         )
       : "—";
+
+
+  const submittedDateLabel =
+    submittedDate
+      ? submittedDate.toLocaleDateString(
+          "en-US",
+          {
+            weekday:
+              "long",
+
+            day:
+              "numeric",
+
+            month:
+              "long",
+
+            year:
+              "numeric",
+          }
+        )
+      : dateLabel;
 
 
   const variants = {
@@ -1560,17 +1691,21 @@ const Booking = () => {
 
                       [
                         "Experience",
-                        service?.name ?? "—",
+                        submittedServiceName ||
+                          service?.name ||
+                          "—",
                       ],
 
                       [
                         "Date",
-                        dateLabel,
+                        submittedDateLabel,
                       ],
 
                       [
                         "Time",
-                        slot ?? "—",
+                        submittedSlot ||
+                          slot ||
+                          "—",
                       ],
                     ].map(
                       ([l, v]) => (
